@@ -1,0 +1,109 @@
+<div class="container-fluid vh-100 d-flex align-items-center justify-content-center bg-light">
+  <div class="row w-100 justify-content-center">
+    <div class="col-12 col-sm-8 col-md-6 col-lg-4">
+      
+      <div class="card shadow-lg border-0">
+        <div class="card-body p-4">
+          
+          <!-- Header -->
+          <div class="text-center mb-4">
+            <h1 class="text-primary fw-bold fs-1 mb-2">🚗 FedoTaxi</h1>
+            <p class="text-muted">Inicia sesión en tu cuenta</p>
+          </div>
+
+          <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+            
+            <!-- Campo de email -->
+            <div class="mb-3">
+              <label for="email" class="form-label">Email</label>
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="fas fa-envelope text-muted"></i>
+                </span>
+                <input
+                  type="email"
+                  class="form-control"
+                  [class.is-invalid]="email?.invalid && email?.touched"
+                  id="email"
+                  placeholder="usuario@example.com"
+                  formControlName="email">
+              </div>
+              
+              <div class="invalid-feedback d-block" *ngIf="email?.invalid && email?.touched">
+                <small *ngIf="email?.errors?.['required']">El email es requerido</small>
+                <small *ngIf="email?.errors?.['email']">Ingresa un email válido</small>
+              </div>
+            </div>
+
+            <!-- Campo de contraseña -->
+            <div class="mb-3">
+              <label for="password" class="form-label">Contraseña</label>
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="fas fa-lock text-muted"></i>
+                </span>
+                <input
+                  type="password"
+                  class="form-control"
+                  [class.is-invalid]="password?.invalid && password?.touched"
+                  id="password"
+                  placeholder="Mínimo 6 caracteres"
+                  formControlName="password">
+                <button 
+                  type="button" 
+                  class="btn btn-outline-secondary"
+                  (click)="togglePasswordVisibility()">
+                  <i class="fas fa-eye"></i>
+                </button>
+              </div>
+              
+              <div class="invalid-feedback d-block" *ngIf="password?.invalid && password?.touched">
+                <small *ngIf="password?.errors?.['required']">La contraseña es requerida</small>
+                <small *ngIf="password?.errors?.['minlength']">La contraseña debe tener al menos 6 caracteres</small>
+              </div>
+            </div>
+
+            <!-- Mensaje de error -->
+            <div class="alert alert-danger d-flex align-items-center" *ngIf="errorMessage">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              <span>{{ errorMessage }}</span>
+            </div>
+
+            <!-- Botón de login -->
+            <button
+              type="submit"
+              class="btn btn-primary w-100 py-2 mb-3"
+              [disabled]="loginForm.invalid || isLoading">
+              
+              <span *ngIf="isLoading" class="spinner-border spinner-border-sm me-2" role="status"></span>
+              <span *ngIf="!isLoading">Iniciar Sesión</span>
+              <span *ngIf="isLoading">Iniciando...</span>
+            </button>
+
+            <!-- Enlace a registro -->
+            <div class="text-center">
+              <p class="mb-0">
+                ¿No tienes cuenta? 
+                <button 
+                  type="button"
+                  class="btn btn-link p-0 text-decoration-none"
+                  (click)="goToRegister()">
+                  Regístrate aquí
+                </button>
+              </p>
+            </div>
+
+          </form>
+        </div>
+      </div>
+      
+      <!-- Información adicional -->
+      <div class="text-center mt-3">
+        <small class="text-muted">
+          Selecciona tu tipo de cuenta al registrarte: Pasajero o Conductor
+        </small>
+      </div>
+      
+    </div>
+  </div>
+</div>

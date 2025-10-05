@@ -1,0 +1,617 @@
+<!-- Header -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+  <div class="container-fluid">
+    <button class="btn btn-outline-light me-2" (click)="goHome()">
+      <i class="fas fa-arrow-left"></i>
+    </button>
+    <span class="navbar-brand fw-bold fs-4">🚖 Solicitar Viaje</span>
+  </div>
+</nav>
+
+<div class="container-fluid p-3">
+
+  <!-- Formulario principal -->
+  <div *ngIf="step === 'form'">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h5 class="card-title mb-0">
+          <i class="fas fa-map-marked-alt me-2"></i>
+          ¿A dónde quieres ir?
+        </h5>
+      </div>
+      <div class="card-body">
+        <form [formGroup]="tripForm" (ngSubmit)="searchNearbyDrivers()">
+          
+          <!-- Configuración de origen -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              <i class="fas fa-map-marker-alt text-success me-2"></i>Origen
+            </label>
+            
+            <!-- Modo GPS -->
+            <div *ngIf="isOriginGPS" class="border rounded p-3 bg-light">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                  <i class="fas fa-satellite-dish text-success me-2"></i>
+                  <div>
+                    <strong class="text-success">Mi ubicación GPS</strong>
+                    <br>
+                    <small class="text-muted" *ngIf="hasValidLocation">
+                      {{ getLocationInfo() }} - {{ getLocationAge() }}
+                    </small>
+                    <small class="text-warning" *ngIf="!hasValidLocation">
+                      <i class="fas fa-spinner fa-spin me-1"></i>Obteniendo ubicación...
+                    </small>
+                  </div>
+                </div>
+                <button type="button" 
+                        class="btn btn-outline-primary btn-sm"
+                        (click)="changeOriginToManual()">
+                  <i class="fas fa-edit me-1"></i>Cambiar
+                </button>
+              </div>
+              
+              <div class="mt-2" *ngIf="hasValidLocation">
+                <button type="button" 
+                        class="btn btn-outline-success btn-sm"
+                        (click)="refreshCurrentLocation()"
+                        [disabled]="!canRefreshLocation">
+                  <i class="fas fa-sync-alt me-1" [class.fa-spin]="isLoadingLocation"></i>
+                  Actualizar GPS
+                </button>
+              </div>
+            </div>
+            
+            <!-- Modo Manual -->
+            <div *ngIf="isOriginManual">
+              <div class="input-group mb-2">
+                <input
+                  type="text"
+                  class="form-control"
+                  [class.is-invalid]="originAddress?.invalid && originAddress?.touched"
+                  formControlName="originAddress"
+                  placeholder="Ej: Av. 9 de Octubre, Guayaquil"
+                  (blur)="geocodeAddress(tripForm.value.originAddress, true)">
+                <button type="button" 
+                        class="btn btn-outline-primary"
+                        (click)="useGPSAsOrigin()"
+                        [disabled]="!hasValidLocation">
+                  <i class="fas fa-crosshairs me-1"></i>Usar Mi Ubicación
+                </button>
+              </div>
+              <div class="invalid-feedback" *ngIf="originAddress?.invalid && originAddress?.touched">
+                <small *ngIf="originAddress?.errors?.['required']">El origen es requerido</small>
+                <small *ngIf="originAddress?.errors?.['minlength']">Ingresa una dirección más específica</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Configuración de destino -->
+          <div class="mb-4">
+            <label class="form-label fw-semibold">
+              <i class="fas fa-map-marker-alt text-danger me-2"></i>Destino
+            </label>
+            
+            <!-- Sin destino establecido -->
+            <div *ngIf="!destinationSet && !isSelectingDestination">
+              <div class="row g-2">
+                <div class="col-md-8">
+                  <input
+                    type="text"
+                    class="form-control"
+                    [class.is-invalid]="destinationAddress?.invalid && destinationAddress?.touched"
+                    formControlName="destinationAddress"
+                    placeholder="Escribe la dirección o selecciona en el mapa"
+                    (blur)="geocodeAddress(tripForm.value.destinationAddress, false)">
+                  <div class="invalid-feedback" *ngIf="destinationAddress?.invalid && destinationAddress?.touched">
+                    <small *ngIf="destinationAddress?.errors?.['required']">El destino es requerido</small>
+                    <small *ngIf="destinationAddress?.errors?.['minlength']">Ingresa una dirección más específica</small>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <button type="button" 
+                          class="btn btn-success w-100"
+                          (click)="startDestinationSelection()"
+                          [disabled]="!canStartDestinationSelection">
+                    <i class="fas fa-map-pin me-2"></i>Seleccionar en Mapa
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Seleccionando en mapa -->
+            <div *ngIf="isSelectingDestination && showDestinationInstructions" 
+                 class="alert alert-info border-info">
+              <div class="d-flex align-items-center">
+                <i class="fas fa-hand-pointer text-info me-2 fa-lg"></i>
+                <div class="flex-grow-1">
+                  <strong>Selecciona tu destino en el mapa</strong>
+                  <br>
+                  <small>Haz clic en cualquier punto del mapa para elegir tu destino</small>
+                </div>
+                <button type="button" 
+                        class="btn btn-outline-secondary btn-sm"
+                        (click)="cancelDestinationSelection()">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+            
+            <!-- Ubicación temporal seleccionada -->
+            <div *ngIf="isSelectingDestination && showDestinationConfirmation" 
+                 class="border rounded p-3 bg-light">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div>
+                  <i class="fas fa-map-pin text-info me-2"></i>
+                  <strong>Ubicación seleccionada</strong>
+                </div>
+                <span class="badge bg-warning text-dark">Temporal</span>
+              </div>
+              
+              <div class="mb-3">
+                <small class="text-muted d-block">Coordenadas:</small>
+                <code class="small">{{ getSelectedLocationText() }}</code>
+              </div>
+              
+              <div class="d-flex gap-2">
+                <button type="button" 
+                        class="btn btn-success flex-grow-1"
+                        (click)="confirmSelectedDestination()"
+                        [disabled]="!canConfirmDestination">
+                  <i class="fas fa-check me-2"></i>Confirmar Destino
+                </button>
+                <button type="button" 
+                        class="btn btn-outline-secondary"
+                        (click)="cancelDestinationSelection()">
+                  <i class="fas fa-times me-2"></i>Cancelar
+                </button>
+              </div>
+            </div>
+            
+            <!-- Destino establecido -->
+            <div *ngIf="destinationSet && !isSelectingDestination" 
+                 class="border rounded p-3 bg-success bg-opacity-10 border-success">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                  <i class="fas fa-check-circle text-success me-2"></i>
+                  <div>
+                    <strong class="text-success">Destino confirmado</strong>
+                    <br>
+                    <small class="text-muted">{{ tripForm.value.destinationAddress }}</small>
+                  </div>
+                </div>
+                <button type="button" 
+                        class="btn btn-outline-success btn-sm"
+                        (click)="clearDestination()">
+                  <i class="fas fa-edit me-1"></i>Cambiar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Información de ubicación -->
+          <div class="alert alert-info" *ngIf="hasValidLocation">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Tu ubicación GPS:</strong> {{ getLocationInfo() }}
+                <br>
+                <small class="text-muted">Obtenida {{ getLocationAge() }} - GPS estático</small>
+              </div>
+              <button 
+                type="button" 
+                class="btn btn-outline-primary btn-sm"
+                (click)="refreshCurrentLocation()"
+                [disabled]="!canRefreshLocation">
+                <i class="fas fa-sync-alt" [class.fa-spin]="isLoadingLocation"></i>
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            class="btn btn-primary w-100 py-2"
+            [disabled]="!formReadyForSearch">
+            <i class="fas fa-search me-2"></i>
+            Buscar Conductores Disponibles
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Mapa interactivo -->
+    <div class="card shadow-sm mt-3" *ngIf="hasValidLocation">
+      <div class="card-header" 
+           [class]="isSelectingDestination ? 'bg-warning text-dark' : 'bg-success text-white'">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="card-title mb-0">
+            <i class="fas fa-map me-2"></i>
+            <span *ngIf="!isSelectingDestination">Vista de ubicaciones</span>
+            <span *ngIf="isSelectingDestination">🎯 Modo Selección de Destino</span>
+          </h6>
+          
+          <div class="d-flex align-items-center gap-2">
+            <span *ngIf="isSelectingDestination" class="badge bg-dark">
+              <i class="fas fa-mouse-pointer me-1"></i>Clickeable
+            </span>
+            <span *ngIf="!isSelectingDestination" class="badge bg-light text-dark">
+              <i class="fas fa-eye me-1"></i>Solo vista
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card-body">
+        <app-base-map
+          [mapId]="'request-trip-map'"
+          [height]="350"
+          [center]="getMapCenter()"
+          [zoom]="15"
+          [userLocation]="userLocation"
+          [clickable]="isSelectingDestination"
+          [showControls]="true"
+          [showMyLocationButton]="true"
+          [loading]="isLoadingLocation"
+          [loadingMessage]="'Cargando ubicación GPS...'"
+          (mapReady)="onMapReady($event)"
+          (locationSelected)="onLocationSelected($event)"
+          (myLocationRequested)="refreshCurrentLocation()">
+        </app-base-map>
+        
+        <div class="mt-3">
+          <div *ngIf="!isSelectingDestination" class="alert alert-light mb-0">
+            <i class="fas fa-info-circle me-2 text-muted"></i>
+            <small class="text-muted">
+              Mapa de referencia. Para seleccionar destino, usa el botón "Seleccionar en Mapa"
+            </small>
+          </div>
+          
+          <div *ngIf="isSelectingDestination && showDestinationInstructions" 
+               class="alert alert-warning mb-0">
+            <i class="fas fa-hand-pointer me-2"></i>
+            <small class="fw-semibold">
+              Haz clic en cualquier punto del mapa para seleccionar tu destino
+            </small>
+          </div>
+          
+          <div *ngIf="isSelectingDestination && showDestinationConfirmation" 
+               class="alert alert-success mb-0">
+            <i class="fas fa-map-pin me-2"></i>
+            <small class="fw-semibold">
+              Ubicación seleccionada. Confirma o selecciona otra ubicación
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Búsqueda en progreso -->
+  <div *ngIf="step === 'searching'">
+    <div class="card shadow-sm">
+      <div class="card-body text-center py-5">
+        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
+        <h4 class="text-primary">Búsqueda inteligente en progreso...</h4>
+        <p class="text-muted">
+          🎯 Radio inicial: 5km (urbano)<br>
+          📡 Si no hay resultados: 12km (metropolitano)<br>
+          🌐 Último recurso: 25km (regional)
+        </p>
+        <div class="progress mt-3" style="height: 8px;">
+          <div class="progress-bar progress-bar-striped progress-bar-animated" 
+               role="progressbar" style="width: 100%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conductores encontrados -->
+  <div *ngIf="step === 'drivers'">
+    
+    <!-- Resultado de búsqueda -->
+    <div class="card shadow-sm mb-3" [class]="driversFound > 0 ? 'border-success' : 'border-warning'">
+      <div class="card-header" [class]="driversFound > 0 ? 'bg-success text-white' : 'bg-warning text-dark'">
+        <h5 class="card-title mb-0">
+          <i class="fas fa-car me-2"></i>
+          Resultado de Búsqueda
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info mb-3" *ngIf="hasSearchResult">
+          <div class="row text-center">
+            <div class="col-md-3">
+              <strong>{{ driversFound }}</strong><br>
+              <small>Conductores</small>
+            </div>
+            <div class="col-md-3">
+              <strong>{{ lastSearchRadius }}km</strong><br>
+              <small>Radio usado</small>
+            </div>
+            <div class="col-md-3">
+              <strong>{{ searchResult!.searchTime | number:'1.0-0' }}ms</strong><br>
+              <small>Tiempo búsqueda</small>
+            </div>
+            <div class="col-md-3">
+              <strong>{{ searchResult!.totalAttempts }}</strong><br>
+              <small>Intentos</small>
+            </div>
+          </div>
+          <div class="text-center mt-2">
+            <small class="text-muted">{{ getSearchStatusMessage() }}</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mapa con conductores y ruta -->
+    <div class="card shadow-sm mb-3" *ngIf="hasValidLocation">
+      <div class="card-header bg-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="card-title mb-0">
+            <i class="fas fa-map me-2"></i>Mapa del Viaje
+          </h6>
+          <div class="d-flex gap-2">
+            <span *ngIf="pollingActive" class="badge bg-light text-dark">
+              <i class="fas fa-sync-alt fa-spin me-1"></i>Actualizando
+            </span>
+            <button class="btn btn-outline-light btn-sm" (click)="manualRefresh()" [disabled]="isUpdatingDrivers">
+              <i class="fas fa-sync-alt" [class.fa-spin]="isUpdatingDrivers"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <app-base-map
+          [mapId]="'drivers-map'"
+          [height]="400"
+          [center]="getMapCenter()"
+          [zoom]="13"
+          [userLocation]="userLocation"
+          [clickable]="false"
+          [showControls]="true"
+          [showMyLocationButton]="true"
+          [loading]="false"
+          (mapReady)="onDriversMapReady($event)"
+          (myLocationRequested)="refreshCurrentLocation()">
+        </app-base-map>
+      </div>
+      <div class="card-footer bg-light">
+        <div class="row text-center">
+          <div class="col-4">
+            <i class="fas fa-circle text-success me-1"></i>
+            <small class="text-muted">Origen</small>
+          </div>
+          <div class="col-4">
+            <i class="fas fa-circle text-danger me-1"></i>
+            <small class="text-muted">Destino</small>
+          </div>
+          <div class="col-4">
+            <i class="fas fa-car text-warning me-1"></i>
+            <small class="text-muted">Conductores ({{ driversFound }})</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista de conductores -->
+    <div class="card shadow-sm mb-3" *ngIf="driversFound > 0">
+      <div class="card-header bg-success text-white">
+        <h6 class="card-title mb-0">
+          <i class="fas fa-list me-2"></i>Conductores Disponibles
+          <span *ngIf="totalChangesDetected > 0" class="badge bg-light text-dark ms-2">
+            {{ totalChangesDetected }} actualizaciones
+          </span>
+        </h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-md-6" *ngFor="let driver of nearbyDrivers; let i = index">
+            <div class="card border-success h-100">
+              <div class="card-body p-3">
+                <div class="d-flex align-items-center">
+                  <div class="bg-success rounded-circle d-flex align-items-center justify-content-center me-3" 
+                       style="width: 40px; height: 40px;">
+                    <i class="fas fa-user text-white"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <h6 class="card-title mb-1">{{ driver.firstName }} {{ driver.lastName }}</h6>
+                    <p class="card-text small text-muted mb-1">
+                      <i class="fas fa-car me-1"></i>{{ driver.vehicleModel }} - {{ driver.vehiclePlate }}
+                    </p>
+                    <p class="card-text small text-muted mb-0" *ngIf="getDriverDistance(driver)">
+                      <i class="fas fa-map-marker-alt me-1"></i>{{ getDriverDistance(driver) }} de distancia
+                    </p>
+                  </div>
+                  <button class="btn btn-outline-primary btn-sm" (click)="focusOnDriver(driver)">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sin conductores -->
+    <div *ngIf="driversFound === 0" class="card shadow-sm mb-3">
+      <div class="card-body text-center py-4">
+        <i class="fas fa-car text-muted mb-3" style="font-size: 3rem; opacity: 0.5;"></i>
+        <h5 class="text-muted">No hay conductores disponibles</h5>
+        <p class="text-muted">
+          Se buscó en un radio de {{ lastSearchRadius }}km sin encontrar conductores disponibles.
+        </p>
+        <button class="btn btn-outline-primary me-2" (click)="retrySearch()">
+          <i class="fas fa-sync-alt me-2"></i>Reintentar Búsqueda
+        </button>
+      </div>
+    </div>
+
+    <!-- Botones de acción -->
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-6">
+            <button class="btn btn-outline-secondary w-100" (click)="goBackToForm()">
+              <i class="fas fa-arrow-left me-2"></i>Volver
+            </button>
+          </div>
+          <div class="col-6">
+            <button 
+              class="btn btn-success w-100" 
+              (click)="requestTrip()"
+              [disabled]="driversFound === 0">
+              <i class="fas fa-check me-2"></i>Confirmar Viaje
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Solicitando viaje -->
+  <div *ngIf="step === 'requesting'">
+    <div class="card shadow-sm">
+      <div class="card-body text-center py-5">
+        <div class="spinner-border text-success mb-3" style="width: 3rem; height: 3rem;"></div>
+        <h4 class="text-success">Procesando tu solicitud...</h4>
+        <p class="text-muted">Asignando el mejor conductor disponible</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mensajes de estado -->
+  <div class="mt-3">
+    <div class="alert alert-danger" *ngIf="errorMessage">
+      <i class="fas fa-exclamation-triangle me-2"></i>
+      {{ errorMessage }}
+    </div>
+
+    <div class="alert alert-success" *ngIf="successMessage">
+      <i class="fas fa-check-circle me-2"></i>
+      {{ successMessage }}
+    </div>
+  </div>
+
+  <!-- Debug (solo desarrollo) -->
+  <div class="card mt-4 bg-light" *ngIf="step === 'form'">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="card-title mb-0">🔍 Debug Info</h6>
+        <button class="btn btn-outline-secondary btn-sm" (click)="debugLocationState()">
+          <i class="fas fa-bug me-1"></i>Log Estado
+        </button>
+      </div>
+      
+      <div class="row g-3 text-small">
+        <div class="col-md-3">
+          <strong>Estado Formulario:</strong><br>
+          <span [class]="formReadyForSearch ? 'text-success' : 'text-danger'">
+            {{ formReadyForSearch ? '✅ Listo' : '❌ Incompleto' }}
+          </span>
+        </div>
+        
+        <div class="col-md-3">
+          <strong>Modo Origen:</strong><br>
+          <span [class]="isOriginGPS ? 'text-success' : 'text-info'">
+            {{ isOriginGPS ? '📡 GPS' : '✏️ Manual' }}
+          </span>
+        </div>
+        
+        <div class="col-md-3">
+          <strong>Estado Destino:</strong><br>
+          <span [class]="destinationSet ? 'text-success' : 'text-warning'">
+            {{ destinationSet ? '✅ Establecido' : 
+               isSelectingDestination ? '🎯 Seleccionando' : '⚠️ Pendiente' }}
+          </span>
+        </div>
+        
+        <div class="col-md-3">
+          <strong>Mapa:</strong><br>
+          <span [class]="isSelectingDestination ? 'text-warning' : 'text-muted'">
+            {{ isSelectingDestination ? '🖱️ Clickeable' : '👁️ Solo vista' }}
+          </span>
+        </div>
+      </div>
+      
+      <hr class="my-3">
+      
+      <div class="row g-3 text-small">
+        <div class="col-md-6">
+          <strong>Origen:</strong> 
+          <code class="small">{{ tripForm.value.originAddress || 'Sin especificar' }}</code><br>
+          <small class="text-muted">
+            Coords: {{ tripForm.value.originLatitude?.toFixed(6) || '0' }}, 
+            {{ tripForm.value.originLongitude?.toFixed(6) || '0' }}
+          </small>
+        </div>
+        
+        <div class="col-md-6">
+          <strong>Destino:</strong> 
+          <code class="small">{{ tripForm.value.destinationAddress || 'Sin especificar' }}</code><br>
+          <small class="text-muted">
+            Coords: {{ tripForm.value.destinationLatitude?.toFixed(6) || '0' }}, 
+            {{ tripForm.value.destinationLongitude?.toFixed(6) || '0' }}
+          </small>
+        </div>
+      </div>
+
+      <div *ngIf="lastSelectedLocation" class="mt-3">
+        <hr>
+        <strong>Selección Temporal:</strong><br>
+        <small class="text-info">{{ getSelectedLocationText() }}</small>
+      </div>
+
+      <div *ngIf="hasSearchResult" class="mt-3">
+        <hr>
+        <strong>Última Búsqueda:</strong><br>
+        <small class="text-muted">{{ getSearchInfo() }}</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Información técnica de búsqueda -->
+  <div class="card mt-4 bg-info text-white" *ngIf="step === 'drivers' && hasSearchResult">
+    <div class="card-body">
+      <h6 class="card-title">📊 Información Técnica de Búsqueda</h6>
+      
+      <div class="row g-3">
+        <div class="col-md-6">
+          <strong>Configuración Utilizada:</strong><br>
+          <small>
+            • Radio inicial: 5km (urbano)<br>
+            • Radio extendido: 12km (metropolitano)<br>
+            • Radio máximo: 25km (regional)
+          </small>
+        </div>
+        
+        <div class="col-md-6">
+          <strong>Resultado Obtenido:</strong><br>
+          <small>
+            • Radio efectivo: {{ lastSearchRadius }}km<br>
+            • Tiempo total: {{ searchResult!.searchTime }}ms<br>
+            • Intentos realizados: {{ searchResult!.totalAttempts }}/3
+          </small>
+        </div>
+      </div>
+      
+      <div class="mt-3">
+        <strong>Coordenadas Base:</strong><br>
+        <code class="text-white">
+          {{ tripForm.value.originLatitude?.toFixed(6) }}, 
+          {{ tripForm.value.originLongitude?.toFixed(6) }}
+        </code>
+        <small class="d-block">GPS obtenido {{ getLocationAge() }} (modo estático)</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer informativo -->
+  <div class="mt-4 text-center">
+    <small class="text-muted">
+      <i class="fas fa-info-circle me-1"></i>
+      Sistema GPS: Modo Estático | Nueva UX de Selección | Búsqueda Inteligente | Mapas OpenStreetMap
+    </small>
+  </div>
+
+</div>

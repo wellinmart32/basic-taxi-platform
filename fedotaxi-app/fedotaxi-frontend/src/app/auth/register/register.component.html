@@ -1,0 +1,259 @@
+<div class="container-fluid min-vh-100 bg-light d-flex align-items-start align-items-lg-center py-3 py-md-4">
+  <div class="row w-100 justify-content-center mt-3 mt-md-4">
+    <div class="col-12 col-sm-8 col-md-6 col-lg-4">
+      
+      <div class="card shadow-lg border-0">
+        <div class="card-body p-3 p-md-4">
+          
+          <!-- Header -->
+          <div class="text-center mb-3">
+            <h1 class="text-primary fw-bold fs-2 fs-md-1 mb-1">🚗 FedoTaxi</h1>
+            <p class="text-muted mb-0">Crea tu cuenta</p>
+          </div>
+
+          <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
+            
+            <!-- Tipo de usuario -->
+            <div class="mb-2">
+              <label class="form-label fw-semibold">Tipo de cuenta</label>
+              <div class="row g-2">
+                <div class="col-6">
+                  <input type="radio" class="btn-check" id="passenger" value="PASSENGER" formControlName="role">
+                  <label class="btn btn-outline-primary w-100 py-2" for="passenger">
+                    <i class="fas fa-user me-2"></i>Pasajero
+                  </label>
+                </div>
+                <div class="col-6">
+                  <input type="radio" class="btn-check" id="driver" value="DRIVER" formControlName="role">
+                  <label class="btn btn-outline-success w-100 py-2" for="driver">
+                    <i class="fas fa-car me-2"></i>Conductor
+                  </label>
+                </div>
+              </div>
+              <div class="invalid-feedback d-block" *ngIf="role?.invalid && role?.touched">
+                <small>Selecciona el tipo de cuenta</small>
+              </div>
+            </div>
+
+            <!-- Información personal -->
+            <div class="row">
+              <div class="col-md-6 mb-2">
+                <label for="firstName" class="form-label">Nombre</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  [class.is-invalid]="firstName?.invalid && firstName?.touched"
+                  id="firstName"
+                  placeholder="Juan"
+                  formControlName="firstName">
+                <div class="invalid-feedback" *ngIf="firstName?.invalid && firstName?.touched">
+                  <small *ngIf="firstName?.errors?.['required']">El nombre es requerido</small>
+                  <small *ngIf="firstName?.errors?.['minlength']">Mínimo 2 caracteres</small>
+                </div>
+              </div>
+
+              <div class="col-md-6 mb-2">
+                <label for="lastName" class="form-label">Apellido</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  [class.is-invalid]="lastName?.invalid && lastName?.touched"
+                  id="lastName"
+                  placeholder="Pérez"
+                  formControlName="lastName">
+                <div class="invalid-feedback" *ngIf="lastName?.invalid && lastName?.touched">
+                  <small *ngIf="lastName?.errors?.['required']">El apellido es requerido</small>
+                  <small *ngIf="lastName?.errors?.['minlength']">Mínimo 2 caracteres</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-2">
+              <label for="email" class="form-label">Email</label>
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="fas fa-envelope text-muted"></i>
+                </span>
+                <input
+                  type="email"
+                  class="form-control"
+                  [class.is-invalid]="email?.invalid && email?.touched"
+                  id="email"
+                  placeholder="usuario@example.com"
+                  formControlName="email">
+              </div>
+              <div class="invalid-feedback d-block" *ngIf="email?.invalid && email?.touched">
+                <small *ngIf="email?.errors?.['required']">El email es requerido</small>
+                <small *ngIf="email?.errors?.['email']">Ingresa un email válido</small>
+              </div>
+            </div>
+
+            <div class="mb-2">
+              <label for="phone" class="form-label">Teléfono</label>
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="fas fa-phone text-muted"></i>
+                </span>
+                <input
+                  type="tel"
+                  class="form-control"
+                  [class.is-invalid]="phone?.invalid && phone?.touched"
+                  id="phone"
+                  placeholder="0987654321"
+                  formControlName="phone">
+              </div>
+              <div class="invalid-feedback d-block" *ngIf="phone?.invalid && phone?.touched">
+                <small *ngIf="phone?.errors?.['required']">El teléfono es requerido</small>
+                <small *ngIf="phone?.errors?.['pattern']">Formato de teléfono inválido</small>
+              </div>
+            </div>
+
+            <div class="mb-2">
+              <label for="password" class="form-label">Contraseña</label>
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="fas fa-lock text-muted"></i>
+                </span>
+                <input
+                  [type]="showPassword ? 'text' : 'password'"
+                  class="form-control"
+                  [class.is-invalid]="password?.invalid && password?.touched"
+                  id="password"
+                  placeholder="Mínimo 6 caracteres"
+                  formControlName="password">
+                <button 
+                  type="button" 
+                  class="btn btn-outline-secondary"
+                  (click)="togglePasswordVisibility()">
+                  <i [class]="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                </button>
+              </div>
+              <div class="invalid-feedback d-block" *ngIf="password?.invalid && password?.touched">
+                <small *ngIf="password?.errors?.['required']">La contraseña es requerida</small>
+                <small *ngIf="password?.errors?.['minlength']">Mínimo 6 caracteres</small>
+              </div>
+            </div>
+
+            <!-- Información del vehículo (solo para conductores) -->
+            <div *ngIf="isDriver" class="border rounded p-2 p-md-3 mb-2 bg-light">
+              <h6 class="text-success mb-2 fs-6">
+                <i class="fas fa-car me-2"></i>Información del Vehículo
+              </h6>
+              
+              <div class="row">
+                <div class="col-md-6 mb-2">
+                  <label for="licenseNumber" class="form-label">Número de Licencia</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    [class.is-invalid]="licenseNumber?.invalid && licenseNumber?.touched"
+                    id="licenseNumber"
+                    placeholder="LIC123456"
+                    formControlName="licenseNumber">
+                  <div class="invalid-feedback" *ngIf="licenseNumber?.invalid && licenseNumber?.touched">
+                    <small *ngIf="licenseNumber?.errors?.['required']">La licencia es requerida</small>
+                  </div>
+                </div>
+
+                <div class="col-md-6 mb-2">
+                  <label for="vehiclePlate" class="form-label">Placa del Vehículo</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    [class.is-invalid]="vehiclePlate?.invalid && vehiclePlate?.touched"
+                    id="vehiclePlate"
+                    placeholder="ABC-123"
+                    formControlName="vehiclePlate">
+                  <div class="invalid-feedback" *ngIf="vehiclePlate?.invalid && vehiclePlate?.touched">
+                    <small *ngIf="vehiclePlate?.errors?.['required']">La placa es requerida</small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-8 mb-2">
+                  <label for="vehicleModel" class="form-label">Modelo del Vehículo</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    [class.is-invalid]="vehicleModel?.invalid && vehicleModel?.touched"
+                    id="vehicleModel"
+                    placeholder="Toyota Corolla"
+                    formControlName="vehicleModel">
+                  <div class="invalid-feedback" *ngIf="vehicleModel?.invalid && vehicleModel?.touched">
+                    <small *ngIf="vehicleModel?.errors?.['required']">El modelo es requerido</small>
+                  </div>
+                </div>
+
+                <div class="col-md-4 mb-2">
+                  <label for="vehicleYear" class="form-label">Año</label>
+                  <input
+                    type="number"
+                    class="form-control"
+                    [class.is-invalid]="vehicleYear?.invalid && vehicleYear?.touched"
+                    id="vehicleYear"
+                    placeholder="2020"
+                    min="1990"
+                    max="2025"
+                    formControlName="vehicleYear">
+                  <div class="invalid-feedback" *ngIf="vehicleYear?.invalid && vehicleYear?.touched">
+                    <small *ngIf="vehicleYear?.errors?.['required']">El año es requerido</small>
+                    <small *ngIf="vehicleYear?.errors?.['min'] || vehicleYear?.errors?.['max']">Año inválido</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mensajes de estado -->
+            <div class="alert alert-danger d-flex align-items-center" *ngIf="errorMessage">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              <span>{{ errorMessage }}</span>
+            </div>
+
+            <div class="alert alert-success d-flex align-items-center" *ngIf="successMessage">
+              <i class="fas fa-check-circle me-2"></i>
+              <span>{{ successMessage }}</span>
+            </div>
+
+            <!-- Botón de registro -->
+            <button
+              type="submit"
+              class="btn btn-primary w-100 py-2 mb-2"
+              [disabled]="registerForm.invalid || isLoading">
+              
+              <span *ngIf="isLoading" class="spinner-border spinner-border-sm me-2" role="status"></span>
+              <span *ngIf="!isLoading">
+                <i [class]="isDriver ? 'fas fa-car me-2' : 'fas fa-user-plus me-2'"></i>
+                {{ isDriver ? 'Registrarse como Conductor' : 'Registrarse como Pasajero' }}
+              </span>
+              <span *ngIf="isLoading">Registrando...</span>
+            </button>
+
+            <!-- Enlace a login -->
+            <div class="text-center">
+              <p class="mb-0">
+                ¿Ya tienes cuenta? 
+                <button 
+                  type="button"
+                  class="btn btn-link p-0 text-decoration-none"
+                  (click)="goToLogin()">
+                  Inicia sesión aquí
+                </button>
+              </p>
+            </div>
+
+          </form>
+        </div>
+      </div>
+      
+      <!-- Información adicional -->
+      <div class="text-center mt-2 mb-3 pb-2">
+        <small class="text-muted">
+          <span *ngIf="!isDriver">Como pasajero podrás solicitar viajes de forma rápida y segura</span>
+          <span *ngIf="isDriver">Como conductor podrás generar ingresos transportando pasajeros</span>
+        </small>
+      </div>
+      
+    </div>
+  </div>
+</div>

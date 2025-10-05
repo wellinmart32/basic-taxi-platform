@@ -1,0 +1,488 @@
+<!-- Header -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+  <div class="container-fluid">
+    <button class="btn btn-outline-light me-2" (click)="goHome()">
+      <i class="fas fa-arrow-left"></i>
+    </button>
+    <span class="navbar-brand fw-bold fs-4">🚖 Estado del Viaje</span>
+    <button class="btn btn-outline-light" (click)="refreshStatus()" [disabled]="isLoading">
+      <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+    </button>
+  </div>
+</nav>
+
+<div class="container-fluid p-3">
+
+  <!-- Estado de carga -->
+  <div *ngIf="isLoading && !trip" class="text-center py-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
+        <h4 class="text-primary">Cargando información del viaje...</h4>
+        <p class="text-muted">Obteniendo los detalles más recientes</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estado de error -->
+  <div *ngIf="errorMessage && !trip" class="alert alert-danger">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>Error:</strong> {{ errorMessage }}
+    <div class="mt-2">
+      <button class="btn btn-outline-danger btn-sm" (click)="goHome()">
+        <i class="fas fa-home me-1"></i>Volver al Inicio
+      </button>
+    </div>
+  </div>
+
+  <!-- Información principal del viaje -->
+  <div *ngIf="trip" class="row g-3">
+    
+    <!-- Tarjeta de estado del viaje -->
+    <div class="col-12">
+      <div class="card shadow-sm border-0">
+        <div class="card-header text-white" [class]="'bg-' + getStatusColor()">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center">
+              <i [class]="getStatusIcon() + ' me-2'" style="font-size: 1.5rem;"></i>
+              <div>
+                <h5 class="card-title mb-1">{{ getStatusText() }}</h5>
+                <small class="opacity-75">Viaje #{{ trip.id }}</small>
+              </div>
+            </div>
+            <div class="text-end">
+              <small class="d-block opacity-75">Última actualización</small>
+              <small class="d-block">{{ getCurrentTimeFormatted() }}</small>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p class="card-text mb-3">{{ getDescriptiveMessage() }}</p>
+          
+          <!-- Barra de progreso -->
+          <div class="progress mb-3" style="height: 8px;">
+            <div class="progress-bar" 
+                 [class]="'bg-' + getStatusColor()"
+                 [style.width.%]="trip.status === 'REQUESTED' ? 25 : 
+                                  trip.status === 'ACCEPTED' ? 50 : 
+                                  trip.status === 'IN_PROGRESS' ? 75 : 100">
+            </div>
+          </div>
+          
+          <!-- Línea de tiempo del estado -->
+          <div class="row text-center">
+            <div class="col-3">
+              <div class="d-flex flex-column align-items-center">
+                <div class="rounded-circle d-flex align-items-center justify-content-center mb-1"
+                     [class]="trip.status === 'REQUESTED' || trip.status === 'ACCEPTED' || 
+                              trip.status === 'IN_PROGRESS' || trip.status === 'COMPLETED' ? 
+                              'bg-' + getStatusColor() + ' text-white' : 'bg-light text-muted'"
+                     style="width: 32px; height: 32px;">
+                  <i class="fas fa-search" style="font-size: 0.9rem;"></i>
+                </div>
+                <small class="text-muted">Solicitado</small>
+              </div>
+            </div>
+            <div class="col-3">
+              <div class="d-flex flex-column align-items-center">
+                <div class="rounded-circle d-flex align-items-center justify-content-center mb-1"
+                     [class]="trip.status === 'ACCEPTED' || trip.status === 'IN_PROGRESS' || 
+                              trip.status === 'COMPLETED' ? 
+                              'bg-' + getStatusColor() + ' text-white' : 'bg-light text-muted'"
+                     style="width: 32px; height: 32px;">
+                  <i class="fas fa-check" style="font-size: 0.9rem;"></i>
+                </div>
+                <small class="text-muted">Aceptado</small>
+              </div>
+            </div>
+            <div class="col-3">
+              <div class="d-flex flex-column align-items-center">
+                <div class="rounded-circle d-flex align-items-center justify-content-center mb-1"
+                     [class]="trip.status === 'IN_PROGRESS' || trip.status === 'COMPLETED' ? 
+                              'bg-' + getStatusColor() + ' text-white' : 'bg-light text-muted'"
+                     style="width: 32px; height: 32px;">
+                  <i class="fas fa-car" style="font-size: 0.9rem;"></i>
+                </div>
+                <small class="text-muted">En Curso</small>
+              </div>
+            </div>
+            <div class="col-3">
+              <div class="d-flex flex-column align-items-center">
+                <div class="rounded-circle d-flex align-items-center justify-content-center mb-1"
+                     [class]="trip.status === 'COMPLETED' ? 
+                              'bg-success text-white' : 'bg-light text-muted'"
+                     style="width: 32px; height: 32px;">
+                  <i class="fas fa-flag-checkered" style="font-size: 0.9rem;"></i>
+                </div>
+                <small class="text-muted">Completado</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mapa del viaje -->
+    <div class="col-12" *ngIf="showTripMap()">
+      <div class="card shadow-sm">
+        <div class="card-header bg-success text-white">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 class="card-title mb-0">
+              <i class="fas fa-map me-2"></i>Seguimiento en Tiempo Real
+            </h6>
+            <div class="d-flex gap-2">
+              <span class="badge bg-light text-dark" *ngIf="hasUserLocation()">
+                <i class="fas fa-satellite-dish me-1"></i>{{ getGPSStatus() }}
+              </span>
+              <span *ngIf="isTrackingEnabled()" class="badge bg-warning text-dark">
+                <i class="fas fa-sync-alt fa-spin me-1"></i>Tracking
+              </span>
+              <button class="btn btn-outline-light btn-sm" (click)="refreshTripLocation()" [disabled]="isLoadingLocation">
+                <i class="fas fa-crosshairs" [class.fa-spin]="isLoadingLocation"></i>
+              </button>
+              <button class="btn btn-outline-light btn-sm" (click)="toggleFullscreenMap()" *ngIf="showFullscreenToggle">
+                <i [class]="isMapFullscreen ? 'fas fa-compress' : 'fas fa-expand'"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <app-base-map
+            [mapId]="'trip-status-map'"
+            [height]="getMapHeight()"
+            [center]="getTripMapCenter()"
+            [zoom]="getTripMapZoom()"
+            [userLocation]="userLocation"
+            [clickable]="false"
+            [showControls]="true"
+            [showMyLocationButton]="true"
+            [showFullscreenButton]="false"
+            [loading]="isLoadingLocation"
+            [loadingMessage]="'Obteniendo ubicación GPS...'"
+            (mapReady)="onTripMapReady($event)"
+            (myLocationRequested)="updateUserLocation()">
+          </app-base-map>
+        </div>
+        <div class="card-footer bg-light">
+          <div class="row text-center small">
+            <div class="col-3">
+              <i class="fas fa-circle text-success me-1"></i>
+              <span class="text-muted">Origen</span>
+            </div>
+            <div class="col-3">
+              <i class="fas fa-circle text-danger me-1"></i>
+              <span class="text-muted">Destino</span>
+            </div>
+            <div class="col-3" *ngIf="shouldShowDriverInfo()">
+              <i class="fas fa-car text-warning me-1"></i>
+              <span class="text-muted">Conductor</span>
+            </div>
+            <div class="col-3">
+              <i class="fas fa-user text-primary me-1"></i>
+              <span class="text-muted">Tú</span>
+            </div>
+          </div>
+          
+          <!-- Información de progreso del viaje -->
+          <div class="row mt-2" *ngIf="trip.status === 'IN_PROGRESS' && hasUserLocation()">
+            <div class="col-md-6 text-center">
+              <small class="text-muted">Distancia restante:</small>
+              <strong class="d-block text-primary">{{ getDistanceToDestination() }}</strong>
+            </div>
+            <div class="col-md-6 text-center">
+              <small class="text-muted">Tiempo estimado:</small>
+              <strong class="d-block text-info">{{ getEstimatedArrival() }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Información del conductor -->
+    <div class="col-md-6" *ngIf="shouldShowDriverInfo()">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-success text-white">
+          <h6 class="card-title mb-0">
+            <i class="fas fa-user-tie me-2"></i>Información del Conductor
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="d-flex align-items-center mb-3">
+            <div class="bg-success rounded-circle d-flex align-items-center justify-content-center me-3" 
+                 style="width: 50px; height: 50px;">
+              <i class="fas fa-user text-white"></i>
+            </div>
+            <div>
+              <h6 class="mb-1">{{ trip.driverName || 'Conductor' }}</h6>
+              <p class="text-muted mb-0">
+                <i class="fas fa-phone me-1"></i>{{ trip.driverPhone || 'N/A' }}
+              </p>
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="bg-light p-2 rounded text-center">
+                <i class="fas fa-car text-primary d-block mb-1"></i>
+                <small class="text-muted d-block">Modelo</small>
+                <strong class="small">{{ trip.vehicleModel || 'N/A' }}</strong>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="bg-light p-2 rounded text-center">
+                <i class="fas fa-hashtag text-primary d-block mb-1"></i>
+                <small class="text-muted d-block">Placa</small>
+                <strong class="small">{{ trip.vehiclePlate || 'N/A' }}</strong>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-success w-100 mt-3" 
+                  *ngIf="trip.driverPhone && (trip.status === 'ACCEPTED' || trip.status === 'IN_PROGRESS')"
+                  (click)="callDriver()">
+            <i class="fas fa-phone me-2"></i>Llamar al Conductor
+          </button>
+
+          <div *ngIf="hasDriverLocation()" class="mt-3">
+            <small class="text-muted d-block">Última ubicación del conductor:</small>
+            <small class="text-success">{{ getDriverLocationAge() }}</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detalles del viaje -->
+    <div class="col-md-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-info text-white">
+          <h6 class="card-title mb-0">
+            <i class="fas fa-route me-2"></i>Detalles del Viaje
+          </h6>
+        </div>
+        <div class="card-body">
+          
+          <!-- Origen -->
+          <div class="d-flex align-items-start mb-3">
+            <div class="bg-success rounded-circle d-flex align-items-center justify-content-center me-3 flex-shrink-0" 
+                 style="width: 24px; height: 24px;">
+              <i class="fas fa-circle text-white" style="font-size: 0.6rem;"></i>
+            </div>
+            <div class="flex-grow-1">
+              <small class="text-muted d-block">Origen</small>
+              <p class="mb-0 small">{{ trip.originAddress || 'Ubicación de origen' }}</p>
+              <small class="text-muted">{{ trip.originLatitude }}, {{ trip.originLongitude }}</small>
+            </div>
+          </div>
+
+          <!-- Destino -->
+          <div class="d-flex align-items-start mb-3">
+            <div class="bg-danger rounded-circle d-flex align-items-center justify-content-center me-3 flex-shrink-0" 
+                 style="width: 24px; height: 24px;">
+              <i class="fas fa-circle text-white" style="font-size: 0.6rem;"></i>
+            </div>
+            <div class="flex-grow-1">
+              <small class="text-muted d-block">Destino</small>
+              <p class="mb-0 small">{{ trip.destinationAddress || 'Ubicación de destino' }}</p>
+              <small class="text-muted">{{ trip.destinationLatitude }}, {{ trip.destinationLongitude }}</small>
+            </div>
+          </div>
+
+          <!-- Ubicación del usuario -->
+          <div class="d-flex align-items-start mb-3" *ngIf="hasUserLocation()">
+            <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3 flex-shrink-0" 
+                 style="width: 24px; height: 24px;">
+              <i class="fas fa-user text-white" style="font-size: 0.6rem;"></i>
+            </div>
+            <div class="flex-grow-1">
+              <small class="text-muted d-block">Tu ubicación actual</small>
+              <p class="mb-0 small">{{ getUserLocationText() }}</p>
+              <small class="text-muted">Actualizada {{ getUserLocationAge() }}</small>
+            </div>
+          </div>
+
+          <!-- Estadísticas del viaje -->
+          <div class="row g-2 mt-3">
+            <div class="col-4" *ngIf="trip.distance">
+              <div class="bg-light p-2 rounded text-center">
+                <i class="fas fa-ruler text-primary d-block mb-1"></i>
+                <small class="text-muted d-block">Distancia</small>
+                <strong class="small">{{ formatDistance(trip.distance) }}</strong>
+              </div>
+            </div>
+            <div class="col-4" *ngIf="trip.fare">
+              <div class="bg-light p-2 rounded text-center">
+                <i class="fas fa-dollar-sign text-success d-block mb-1"></i>
+                <small class="text-muted d-block">Tarifa</small>
+                <strong class="small">{{ formatFare(trip.fare) }}</strong>
+              </div>
+            </div>
+            <div class="col-4" *ngIf="trip.startTime || trip.requestTime">
+              <div class="bg-light p-2 rounded text-center">
+                <i class="fas fa-clock text-warning d-block mb-1"></i>
+                <small class="text-muted d-block">Hora</small>
+                <strong class="small">{{ formatTime(trip.startTime || trip.requestTime) }}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones de acción -->
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="row g-2">
+            
+            <div class="col-md-3" *ngIf="getAvailableActions().includes('track')">
+              <button class="btn btn-primary w-100" (click)="goToTracking()">
+                <i class="fas fa-map-marked-alt me-2"></i>Seguir en Tiempo Real
+              </button>
+            </div>
+
+            <div class="col-md-3" *ngIf="showTrackingToggle()">
+              <button class="btn" 
+                      [class]="isTrackingEnabled() ? 'btn-warning' : 'btn-outline-success'"
+                      (click)="toggleLocationTracking()"
+                      [disabled]="isLoadingLocation">
+                <span *ngIf="!isTrackingEnabled()">
+                  <i class="fas fa-play me-2"></i>Iniciar Tracking
+                </span>
+                <span *ngIf="isTrackingEnabled()">
+                  <i class="fas fa-pause me-2"></i>Pausar Tracking
+                </span>
+              </button>
+            </div>
+
+            <div class="col-md-3" *ngIf="getAvailableActions().includes('cancel')">
+              <button class="btn btn-outline-danger w-100" 
+                      (click)="cancelTrip()" 
+                      [disabled]="isLoadingAction">
+                <span *ngIf="!isLoadingAction">
+                  <i class="fas fa-times me-2"></i>Cancelar Viaje
+                </span>
+                <span *ngIf="isLoadingAction">
+                  <i class="fas fa-spinner fa-spin me-2"></i>Cancelando...
+                </span>
+              </button>
+            </div>
+
+            <div class="col-md-3" *ngIf="getAvailableActions().includes('history')">
+              <button class="btn btn-outline-info w-100" (click)="goToHistory()">
+                <i class="fas fa-history me-2"></i>Ver Historial
+              </button>
+            </div>
+
+            <div class="col-md-3" *ngIf="!getAvailableActions().includes('cancel')">
+              <button class="btn btn-outline-secondary w-100" (click)="goHome()">
+                <i class="fas fa-home me-2"></i>Ir al Inicio
+              </button>
+            </div>
+            
+            <div class="col-md-3" *ngIf="isPassenger && shouldShowDriverInfo() && trip && trip.driverPhone">
+              <button class="btn btn-success w-100" (click)="callDriver()">
+                <i class="fas fa-phone me-2"></i>Llamar
+              </button>
+            </div>
+
+            <div class="col-md-3" *ngIf="canRefreshLocation()">
+              <button class="btn btn-outline-primary w-100" 
+                      (click)="refreshTripLocation()" 
+                      [disabled]="isLoadingLocation">
+                <span *ngIf="!isLoadingLocation">
+                  <i class="fas fa-sync me-2"></i>Actualizar GPS
+                </span>
+                <span *ngIf="isLoadingLocation">
+                  <i class="fas fa-spinner fa-spin me-2"></i>Actualizando...
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Mensajes de estado -->
+  <div class="mt-3">
+    <div class="alert alert-success" *ngIf="successMessage">
+      <i class="fas fa-check-circle me-2"></i>
+      {{ successMessage }}
+    </div>
+
+    <div class="alert alert-danger" *ngIf="errorMessage && trip">
+      <i class="fas fa-exclamation-triangle me-2"></i>
+      {{ errorMessage }}
+    </div>
+  </div>
+
+  <!-- Información de tracking GPS -->
+  <div class="card mt-3 bg-light" *ngIf="trip && showTrackingInfo()">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="card-title mb-0">📍 Información de Tracking GPS</h6>
+        <button class="btn btn-outline-secondary btn-sm" (click)="debugTripState()">
+          <i class="fas fa-bug me-1"></i>Debug
+        </button>
+      </div>
+      
+      <div class="row g-3 text-small">
+        <div class="col-md-3">
+          <strong>Estado GPS:</strong><br>
+          <span [class]="'text-' + (getGPSStatus() === 'Excelente' ? 'success' : getGPSStatus() === 'Buena' ? 'info' : 'warning')">
+            {{ getGPSStatus() }}
+          </span>
+        </div>
+        
+        <div class="col-md-3">
+          <strong>Tracking:</strong><br>
+          <span [class]="isTrackingEnabled() ? 'text-success' : 'text-muted'">
+            {{ isTrackingEnabled() ? '✅ Activo' : '⏸️ Pausado' }}
+          </span>
+        </div>
+        
+        <div class="col-md-3">
+          <strong>Última actualización:</strong><br>
+          <span class="text-muted">{{ getUserLocationAge() || 'No disponible' }}</span>
+        </div>
+        
+        <div class="col-md-3">
+          <strong>Precisión GPS:</strong><br>
+          <span class="text-info">{{ getLocationAccuracy() }}</span>
+        </div>
+      </div>
+      
+      <hr class="my-3">
+      
+      <div class="row g-3 text-small">
+        <div class="col-md-6">
+          <strong>Tu ubicación:</strong><br>
+          <code class="small">{{ getUserLocationCoords() || 'No disponible' }}</code>
+        </div>
+        <div class="col-md-6">
+          <strong>Progreso del viaje:</strong><br>
+          <small class="text-muted">
+            {{ getTripProgressInfo() }}
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Indicador de actualización automática -->
+  <div class="fixed-bottom p-3" *ngIf="trip && (trip.status === 'REQUESTED' || trip.status === 'ACCEPTED' || trip.status === 'IN_PROGRESS')">
+    <div class="d-flex justify-content-center">
+      <div class="bg-dark text-white px-3 py-2 rounded-pill d-inline-flex align-items-center opacity-75">
+        <div class="spinner-border spinner-border-sm me-2" style="width: 16px; height: 16px;"></div>
+        <small>
+          Actualizando automáticamente...
+          <span *ngIf="isTrackingEnabled()" class="ms-2">
+            | <i class="fas fa-satellite-dish me-1"></i>GPS Tracking
+          </span>
+        </small>
+      </div>
+    </div>
+  </div>
+
+</div>

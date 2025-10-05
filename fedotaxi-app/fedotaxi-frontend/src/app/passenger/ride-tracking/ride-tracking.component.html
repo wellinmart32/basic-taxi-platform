@@ -1,0 +1,290 @@
+<!-- Header -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+  <div class="container-fluid">
+    <button class="btn btn-outline-light me-2" (click)="goToTripStatus()">
+      <i class="fas fa-arrow-left"></i>
+    </button>
+    <span class="navbar-brand fw-bold fs-4">🗺️ Seguimiento en Tiempo Real</span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-light btn-sm" (click)="refreshTracking()">
+        <i class="fas fa-sync-alt"></i>
+      </button>
+      <button class="btn btn-outline-light btn-sm" (click)="centerOnMyLocation()">
+        <i class="fas fa-crosshairs"></i>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid p-3">
+
+  <!-- Estado de carga -->
+  <div *ngIf="isLoading" class="text-center py-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
+        <h4 class="text-primary">Iniciando seguimiento...</h4>
+        <p class="text-muted">Obteniendo información del viaje y ubicación</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estado de error -->
+  <div *ngIf="errorMessage" class="alert alert-danger">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>Error:</strong> {{ errorMessage }}
+  </div>
+
+  <!-- Interfaz principal de seguimiento -->
+  <div *ngIf="trip && !isLoading">
+
+    <!-- Información del viaje en curso -->
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <div class="card bg-primary text-white shadow-sm">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-md-8">
+                <h5 class="card-title mb-1">
+                  <i class="fas fa-car me-2"></i>Viaje en Progreso - #{{ trip.id }}
+                </h5>
+                <p class="card-text mb-0 opacity-75">
+                  Conductor: {{ trip.driverName }} | {{ trip.vehicleModel }} - {{ trip.vehiclePlate }}
+                </p>
+              </div>
+              <div class="col-md-4 text-md-end">
+                <div class="d-flex justify-content-md-end align-items-center gap-3">
+                  <div class="text-center">
+                    <div class="fw-bold fs-5">{{ formatDistance(distanceToDestination) }}</div>
+                    <small class="opacity-75">Restante</small>
+                  </div>
+                  <div class="text-center" *ngIf="estimatedArrival">
+                    <div class="fw-bold fs-5">{{ estimatedArrival }}</div>
+                    <small class="opacity-75">ETA</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barra de estado GPS -->
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <div class="card shadow-sm">
+          <div class="card-body py-2">
+            <div class="row align-items-center">
+              <div class="col-md-6">
+                <div class="d-flex align-items-center">
+                  <div class="me-3">
+                    <i class="fas fa-satellite-dish" [class]="getGPSStatusClass()"></i>
+                    <span class="ms-1" [class]="getGPSStatusClass()">GPS: {{ getGPSStatus() }}</span>
+                  </div>
+                  <div class="me-3" *ngIf="isTrackingUser">
+                    <div class="spinner-border spinner-border-sm text-success me-1" style="width: 16px; height: 16px;"></div>
+                    <small class="text-success">Seguimiento activo</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6 text-md-end">
+                <small class="text-muted">
+                  Actualización: cada {{ LOCATION_TRACKING_INTERVAL / 1000 }}s
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sección del mapa -->
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <div class="card shadow-sm">
+          <div class="card-header bg-success text-white">
+            <h6 class="card-title mb-0">
+              <i class="fas fa-map me-2"></i>Mapa del Viaje
+            </h6>
+          </div>
+          <div class="card-body">
+            <!-- Placeholder para integración futura de mapa -->
+            <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height: 300px;">
+              <div class="text-center">
+                <i class="fas fa-map text-success mb-3" style="font-size: 3rem; opacity: 0.7;"></i>
+                <h5 class="text-muted">Integración de Mapa</h5>
+                <p class="text-muted mb-0">
+                  Esta sección mostrará el mapa en tiempo real<br>
+                  con la ubicación del vehículo y la ruta
+                </p>
+              </div>
+            </div>
+            
+            <!-- Información de la ruta -->
+            <div class="row g-2 mt-3">
+              <div class="col-md-6">
+                <div class="d-flex align-items-center p-2 bg-light rounded">
+                  <div class="bg-success rounded-circle me-3" style="width: 12px; height: 12px;"></div>
+                  <div class="flex-grow-1">
+                    <small class="text-muted d-block">Origen</small>
+                    <strong class="small">{{ trip.originAddress || 'Punto de recogida' }}</strong>
+                    <br><small class="text-muted">{{ trip.originLatitude }}, {{ trip.originLongitude }}</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="d-flex align-items-center p-2 bg-light rounded">
+                  <div class="bg-danger rounded-circle me-3" style="width: 12px; height: 12px;"></div>
+                  <div>
+                    <small class="text-muted d-block">Destino</small>
+                    <strong class="small">{{ trip.destinationAddress || 'Punto de destino' }}</strong>
+                    <br><small class="text-muted">{{ trip.destinationLatitude }}, {{ trip.destinationLongitude }}</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detalles de ubicación -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-header bg-info text-white">
+            <h6 class="card-title mb-0">
+              <i class="fas fa-location-arrow me-2"></i>Tu Ubicación
+            </h6>
+          </div>
+          <div class="card-body">
+            <div *ngIf="userLocation; else noUserLocation">
+              <div class="row g-2">
+                <div class="col-12">
+                  <div class="bg-light p-2 rounded">
+                    <small class="text-muted d-block">Coordenadas</small>
+                    <code class="small">{{ getFormattedCoordinates(userLocation) }}</code>
+                  </div>
+                </div>
+                <div class="col-6" *ngIf="userLocation.accuracy">
+                  <div class="bg-light p-2 rounded text-center">
+                    <small class="text-muted d-block">Precisión</small>
+                    <strong class="small">±{{ userLocation.accuracy | number:'1.0-0' }}m</strong>
+                  </div>
+                </div>
+                <div class="col-6" *ngIf="userLocation.timestamp">
+                  <div class="bg-light p-2 rounded text-center">
+                    <small class="text-muted d-block">Actualizado</small>
+                    <strong class="small">{{ (userLocation.timestamp | date:'HH:mm:ss') || 'Ahora' }}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <ng-template #noUserLocation>
+              <div class="text-center py-3">
+                <i class="fas fa-location-slash text-muted mb-2" style="font-size: 2rem;"></i>
+                <p class="text-muted mb-0">Ubicación no disponible</p>
+                <button class="btn btn-outline-primary btn-sm mt-2" (click)="centerOnMyLocation()">
+                  <i class="fas fa-sync me-1"></i>Reintentar
+                </button>
+              </div>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-header bg-warning text-dark">
+            <h6 class="card-title mb-0">
+              <i class="fas fa-car me-2"></i>Información del Conductor
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-3">
+              <div class="bg-warning rounded-circle d-flex align-items-center justify-content-center me-3" 
+                   style="width: 40px; height: 40px;">
+                <i class="fas fa-user text-dark"></i>
+              </div>
+              <div>
+                <strong class="d-block">{{ trip.driverName }}</strong>
+                <small class="text-muted">{{ trip.driverPhone }}</small>
+              </div>
+            </div>
+
+            <div class="row g-2">
+              <div class="col-6">
+                <div class="bg-light p-2 rounded text-center">
+                  <i class="fas fa-car text-primary d-block mb-1"></i>
+                  <small class="text-muted d-block">Vehículo</small>
+                  <strong class="small">{{ trip.vehicleModel }}</strong>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="bg-light p-2 rounded text-center">
+                  <i class="fas fa-hashtag text-primary d-block mb-1"></i>
+                  <small class="text-muted d-block">Placa</small>
+                  <strong class="small">{{ trip.vehiclePlate }}</strong>
+                </div>
+              </div>
+            </div>
+
+            <button class="btn btn-success w-100 mt-3" 
+                    *ngIf="trip.driverPhone"
+                    (click)="callDriver()">
+              <i class="fas fa-phone me-2"></i>Llamar al Conductor
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones de control -->
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="row g-2">
+              <div class="col-md-3">
+                <button class="btn btn-primary w-100" (click)="refreshTracking()">
+                  <i class="fas fa-sync-alt me-2"></i>Actualizar
+                </button>
+              </div>
+              <div class="col-md-3">
+                <button class="btn btn-outline-primary w-100" (click)="centerOnMyLocation()" [disabled]="isLoadingLocation">
+                  <span *ngIf="!isLoadingLocation">
+                    <i class="fas fa-crosshairs me-2"></i>Mi Ubicación
+                  </span>
+                  <span *ngIf="isLoadingLocation">
+                    <i class="fas fa-spinner fa-spin me-2"></i>Obteniendo...
+                  </span>
+                </button>
+              </div>
+              <div class="col-md-3">
+                <button class="btn btn-outline-warning w-100" (click)="stopTracking()">
+                  <i class="fas fa-stop me-2"></i>Detener Seguimiento
+                </button>
+              </div>
+              <div class="col-md-3">
+                <button class="btn btn-outline-secondary w-100" (click)="goHome()">
+                  <i class="fas fa-home me-2"></i>Ir al Inicio
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Indicador de seguimiento activo -->
+  <div class="fixed-bottom p-3" *ngIf="isTrackingUser && trip">
+    <div class="bg-success text-white px-3 py-2 rounded-pill d-inline-flex align-items-center">
+      <div class="spinner-border spinner-border-sm me-2" style="width: 16px; height: 16px;"></div>
+      <small><strong>Seguimiento Activo</strong> - Actualizando cada {{ LOCATION_TRACKING_INTERVAL / 1000 }}s</small>
+    </div>
+  </div>
+
+</div>

@@ -1,0 +1,154 @@
+<div class="position-relative bg-light">
+  <!-- Contenedor del mapa -->
+  <div #mapContainer 
+       [id]="mapId" 
+       class="rounded border"
+       [class.map-pattern]="!isMapLoaded"
+       [style.height.px]="height"
+       [style.min-height.px]="300">
+  </div>
+  
+  <!-- Overlay de carga -->
+  <div *ngIf="loading" 
+       class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-light bg-opacity-75 rounded">
+    <div class="text-center">
+      <div class="spinner-border text-primary mb-2"></div>
+      <div class="small text-muted">{{ loadingMessage }}</div>
+    </div>
+  </div>
+  
+  <!-- Controles de zoom y navegación -->
+  <div *ngIf="showControls" 
+       class="position-absolute top-0 end-0 p-2 d-flex flex-column gap-2"
+       style="z-index: 1000;">
+    
+    <!-- Controles de zoom -->
+    <div class="btn-group-vertical shadow-sm">
+      <button class="btn btn-light border btn-sm" 
+              (click)="zoomIn()" 
+              [disabled]="!canZoomIn"
+              title="Acercar">
+        <i class="fas fa-plus"></i>
+      </button>
+      <button class="btn btn-light border btn-sm" 
+              (click)="zoomOut()" 
+              [disabled]="!canZoomOut"
+              title="Alejar">
+        <i class="fas fa-minus"></i>
+      </button>
+    </div>
+    
+    <!-- Botón mi ubicación -->
+    <button *ngIf="showMyLocationButton" 
+            class="btn btn-primary shadow-sm btn-sm" 
+            (click)="centerOnMyLocation()"
+            [disabled]="!enableGeolocation"
+            title="Mi ubicación">
+      <i class="fas fa-crosshairs"></i>
+    </button>
+    
+    <!-- Botón de actualización -->
+    <button *ngIf="showRefreshButton" 
+            class="btn btn-info shadow-sm btn-sm" 
+            (click)="refreshMap()"
+            title="Actualizar mapa">
+      <i class="fas fa-sync-alt"></i>
+    </button>
+    
+    <!-- Botón pantalla completa -->
+    <button *ngIf="showFullscreenButton" 
+            class="btn btn-secondary shadow-sm btn-sm" 
+            (click)="toggleFullscreen()"
+            [title]="isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'">
+      <i [class]="isFullscreen ? 'fas fa-compress' : 'fas fa-expand'"></i>
+    </button>
+  </div>
+  
+  <!-- Panel de información -->
+  <div *ngIf="showInfoPanel && isMapLoaded" 
+       class="position-absolute top-0 start-0 p-2"
+       style="z-index: 1000;">
+    <div class="card shadow-sm" style="min-width: 200px;">
+      <div class="card-body py-2 px-3">
+        <h6 class="card-title mb-2 small">
+          <i class="fas fa-info-circle text-primary me-1"></i>
+          Información del Mapa
+        </h6>
+        <div class="small">
+          <div class="mb-1">
+            <strong>Zoom:</strong> {{ getCurrentZoom() }}
+          </div>
+          <div class="mb-1" *ngIf="hasUserLocation">
+            <strong>GPS:</strong> 
+            <span [class]="'text-' + (getGPSAccuracy() === 'Excelente' ? 'success' : getGPSAccuracy() === 'Buena' ? 'info' : 'warning')">
+              {{ getGPSAccuracy() }}
+            </span>
+          </div>
+          <div *ngIf="hasUserLocation">
+            <strong>Ubicación:</strong>
+            <div class="font-monospace" style="font-size: 0.7rem;">
+              {{ getLocationInfo() }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Barra de estado -->
+  <div *ngIf="showStatusBar" 
+       class="position-absolute bottom-0 start-0 end-0 p-2"
+       style="z-index: 1000;">
+    <div class="bg-dark bg-opacity-75 text-white px-3 py-1 rounded d-flex justify-content-between align-items-center">
+      <div class="small">
+        <i class="fas fa-map me-1"></i>
+        {{ getMapStatusText() }}
+      </div>
+      <div class="small" *ngIf="selectedLocation">
+        <i class="fas fa-map-pin me-1"></i>
+        Ubicación seleccionada
+      </div>
+    </div>
+  </div>
+  
+  <!-- Acciones de selección -->
+  <div *ngIf="showSelectionActions && selectedLocation" 
+       class="position-absolute bottom-0 start-50 translate-middle-x p-2"
+       style="z-index: 1000;">
+    <div class="card shadow">
+      <div class="card-body py-2 px-3">
+        <div class="d-flex gap-2 align-items-center">
+          <span class="small text-muted">
+            <i class="fas fa-map-pin text-primary me-1"></i>
+            Ubicación seleccionada
+          </span>
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-success" (click)="confirmSelection()">
+              <i class="fas fa-check me-1"></i>Confirmar
+            </button>
+            <button class="btn btn-outline-secondary" (click)="clearSelection()">
+              <i class="fas fa-times me-1"></i>Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Indicador de click -->
+  <div *ngIf="clickable && !selectedLocation" 
+       class="position-absolute bottom-0 start-0 p-2"
+       style="z-index: 1000;">
+    <div class="badge bg-info">
+      <i class="fas fa-mouse-pointer me-1"></i>
+      Haz clic para seleccionar ubicación
+    </div>
+  </div>
+  
+  <!-- Overlay para pantalla completa -->
+  <div *ngIf="isFullscreen" 
+       class="position-fixed top-0 start-0 w-100 h-100 bg-dark"
+       style="z-index: 9998;">
+  </div>
+  
+</div>

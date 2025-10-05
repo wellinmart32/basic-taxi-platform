@@ -1,0 +1,335 @@
+<!-- Header -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+  <div class="container-fluid">
+    <button class="btn btn-outline-light me-2" (click)="goHome()">
+      <i class="fas fa-arrow-left"></i>
+    </button>
+    <span class="navbar-brand fw-bold fs-4">📋 Historial de Viajes</span>
+    <button class="btn btn-outline-light" (click)="refreshHistory()" [disabled]="isLoading">
+      <i class="fas fa-sync-alt" [class.fa-spin]="isLoading"></i>
+    </button>
+  </div>
+</nav>
+
+<div class="container-fluid p-3">
+
+  <!-- Estado de carga -->
+  <div *ngIf="isLoading" class="text-center py-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
+        <h4 class="text-primary">Cargando historial...</h4>
+        <p class="text-muted">Obteniendo tus viajes anteriores</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estado de error -->
+  <div *ngIf="errorMessage" class="alert alert-danger">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>Error:</strong> {{ errorMessage }}
+    <button class="btn btn-outline-danger btn-sm ms-2" (click)="refreshHistory()">
+      <i class="fas fa-retry me-1"></i>Reintentar
+    </button>
+  </div>
+
+  <!-- Contenido principal -->
+  <div *ngIf="!isLoading && !errorMessage">
+
+    <!-- Tarjetas de estadísticas -->
+    <div class="row g-3 mb-4" *ngIf="hasTrips()">
+      <div class="col-md-3 col-6">
+        <div class="card bg-primary text-white shadow-sm">
+          <div class="card-body text-center">
+            <i class="fas fa-list-alt mb-2" style="font-size: 2rem;"></i>
+            <h4 class="card-title mb-1">{{ totalTrips }}</h4>
+            <p class="card-text small mb-0">Total Viajes</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="card bg-success text-white shadow-sm">
+          <div class="card-body text-center">
+            <i class="fas fa-check-circle mb-2" style="font-size: 2rem;"></i>
+            <h4 class="card-title mb-1">{{ completedTrips }}</h4>
+            <p class="card-text small mb-0">Completados</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="card bg-info text-white shadow-sm">
+          <div class="card-body text-center">
+            <i class="fas fa-route mb-2" style="font-size: 2rem;"></i>
+            <h4 class="card-title mb-1">{{ formatDistance(totalDistance) }}</h4>
+            <p class="card-text small mb-0">Distancia Total</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="card bg-warning text-dark shadow-sm">
+          <div class="card-body text-center">
+            <i class="fas fa-dollar-sign mb-2" style="font-size: 2rem;"></i>
+            <h4 class="card-title mb-1">{{ formatFare(totalFare) }}</h4>
+            <p class="card-text small mb-0">Total Gastado</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estadísticas adicionales -->
+    <div class="row g-3 mb-4" *ngIf="hasTrips() && completedTrips > 0">
+      <div class="col-md-6">
+        <div class="card shadow-sm">
+          <div class="card-body text-center">
+            <i class="fas fa-chart-line text-success mb-2" style="font-size: 1.5rem;"></i>
+            <h5 class="card-title">{{ getCompletionRate() | number:'1.1-1' }}%</h5>
+            <p class="card-text text-muted small mb-0">Tasa de Completación</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card shadow-sm">
+          <div class="card-body text-center">
+            <i class="fas fa-calculator text-info mb-2" style="font-size: 1.5rem;"></i>
+            <h5 class="card-title">{{ formatFare(getAverageFare()) }}</h5>
+            <p class="card-text text-muted small mb-0">Promedio por Viaje</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filtros y búsqueda -->
+    <div class="card shadow-sm mb-4" *ngIf="hasTrips()">
+      <div class="card-body">
+        <div class="row align-items-center g-3">
+          <div class="col-md-6">
+            <div class="btn-group w-100" role="group">
+              <button class="btn" 
+                      [class]="getFilterButtonClass('all')"
+                      (click)="applyFilter('all')">
+                <i class="fas fa-list me-1"></i>Todos ({{ totalTrips }})
+              </button>
+              <button class="btn" 
+                      [class]="getFilterButtonClass('completed')"
+                      (click)="applyFilter('completed')">
+                <i class="fas fa-check me-1"></i>Completados ({{ completedTrips }})
+              </button>
+              <button class="btn" 
+                      [class]="getFilterButtonClass('cancelled')"
+                      (click)="applyFilter('cancelled')">
+                <i class="fas fa-times me-1"></i>Cancelados ({{ cancelledTrips }})
+              </button>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="input-group">
+              <span class="input-group-text">
+                <i class="fas fa-search"></i>
+              </span>
+              <input type="text" 
+                     class="form-control" 
+                     placeholder="Buscar por destino, conductor, placa..."
+                     [value]="searchTerm"
+                     (input)="onSearchInput($event)">
+              <button class="btn btn-outline-secondary" 
+                      type="button"
+                      *ngIf="searchTerm"
+                      (click)="clearSearch()">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista de viajes -->
+    <div *ngIf="hasFilteredResults(); else emptyState">
+      
+      <!-- Controles de ordenamiento -->
+      <div class="card shadow-sm mb-3" *ngIf="hasTrips()">
+        <div class="card-body py-2">
+          <div class="row align-items-center">
+            <div class="col-md-6">
+              <small class="text-muted">Ordenar por:</small>
+              <div class="btn-group btn-group-sm ms-2" role="group">
+                <button class="btn" 
+                        [class]="isColumnSorted('date') ? 'btn-primary' : 'btn-outline-secondary'"
+                        (click)="changeSorting('date')">
+                  <i [class]="getSortIcon('date')" style="font-size: 0.8rem;"></i>
+                  Fecha
+                </button>
+                <button class="btn" 
+                        [class]="isColumnSorted('fare') ? 'btn-primary' : 'btn-outline-secondary'"
+                        (click)="changeSorting('fare')">
+                  <i [class]="getSortIcon('fare')" style="font-size: 0.8rem;"></i>
+                  Tarifa
+                </button>
+                <button class="btn" 
+                        [class]="isColumnSorted('distance') ? 'btn-primary' : 'btn-outline-secondary'"
+                        (click)="changeSorting('distance')">
+                  <i [class]="getSortIcon('distance')" style="font-size: 0.8rem;"></i>
+                  Distancia
+                </button>
+              </div>
+            </div>
+            <div class="col-md-6 text-md-end">
+              <small class="text-muted">
+                Mostrando {{ filteredTrips.length }} de {{ getTotalFilteredCount() }} viajes
+                {{ getTotalFilteredCount() !== totalTrips ? '(filtrados)' : '' }}
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-12" *ngFor="let trip of filteredTrips; trackBy: trackByTripId">
+          <div class="card shadow-sm" [class]="getCardBorderClass(trip.status)">
+            <div class="card-body">
+              <div class="row align-items-center">
+                
+                <!-- Estado y ID del viaje -->
+                <div class="col-md-2 col-sm-3 text-center mb-2 mb-md-0">
+                  <div class="d-flex flex-column align-items-center">
+                    <i [class]="getStatusIcon(trip.status)" style="font-size: 1.5rem;"></i>
+                    <small class="text-muted mt-1">Viaje #{{ trip.id }}</small>
+                    <span class="badge" 
+                          [class]="trip.status === 'COMPLETED' ? 'bg-success' : 'bg-danger'">
+                      {{ getStatusText(trip.status) }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Información de la ruta -->
+                <div class="col-md-5 col-sm-9 mb-2 mb-md-0">
+                  <div class="d-flex flex-column">
+                    <!-- Origen -->
+                    <div class="d-flex align-items-center mb-2">
+                      <div class="bg-success rounded-circle me-2" style="width: 8px; height: 8px;"></div>
+                      <div class="flex-grow-1">
+                        <small class="text-muted">Origen:</small>
+                        <div class="fw-medium">{{ truncateText(trip.originAddress) }}</div>
+                      </div>
+                    </div>
+                    <!-- Destino -->
+                    <div class="d-flex align-items-center">
+                      <div class="bg-danger rounded-circle me-2" style="width: 8px; height: 8px;"></div>
+                      <div class="flex-grow-1">
+                        <small class="text-muted">Destino:</small>
+                        <div class="fw-medium">{{ truncateText(trip.destinationAddress) }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Información conductor/vehículo -->
+                <div class="col-md-3 col-sm-6 mb-2 mb-md-0">
+                  <div class="text-center text-md-start">
+                    <div class="fw-medium">{{ trip.driverName || 'N/A' }}</div>
+                    <small class="text-muted d-block">{{ trip.vehicleModel || 'N/A' }}</small>
+                    <small class="text-muted">{{ trip.vehiclePlate || 'N/A' }}</small>
+                  </div>
+                </div>
+
+                <!-- Detalles del viaje -->
+                <div class="col-md-2 col-sm-6">
+                  <div class="text-center text-md-end">
+                    <div class="fw-bold text-success" *ngIf="trip.fare">
+                      {{ formatFare(trip.fare) }}
+                    </div>
+                    <small class="text-muted d-block" *ngIf="trip.distance">
+                      {{ formatDistance(trip.distance) }}
+                    </small>
+                    <small class="text-muted d-block">
+                      {{ formatDate(trip.endTime || trip.requestTime) }}
+                    </small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Botón de acción -->
+              <div class="row mt-3">
+                <div class="col-12 text-end">
+                  <button class="btn btn-outline-primary btn-sm" 
+                          (click)="viewTripDetails(trip)">
+                    <i class="fas fa-eye me-1"></i>Ver Detalles
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Paginación -->
+      <div class="d-flex justify-content-center mt-4" *ngIf="totalPages > 1">
+        <nav aria-label="Navegación de páginas">
+          <ul class="pagination">
+            <li class="page-item" [class.disabled]="currentPage === 1">
+              <button class="page-link" (click)="changePage(currentPage - 1)" [disabled]="currentPage === 1">
+                <i class="fas fa-chevron-left"></i>
+              </button>
+            </li>
+            
+            <li class="page-item" *ngFor="let page of getVisiblePages()" [class.active]="page === currentPage">
+              <button class="page-link" (click)="changePage(page)">{{ page }}</button>
+            </li>
+            
+            <li class="page-item" [class.disabled]="currentPage === totalPages">
+              <button class="page-link" (click)="changePage(currentPage + 1)" [disabled]="currentPage === totalPages">
+                <i class="fas fa-chevron-right"></i>
+              </button>
+            </li>
+          </ul>
+        </nav>
+      </div>
+
+      <!-- Información de paginación -->
+      <div class="text-center mt-2" *ngIf="totalPages > 1">
+        <small class="text-muted">
+          Página {{ currentPage }} de {{ totalPages }} 
+          ({{ getTotalFilteredCount() }} {{ getTotalFilteredCount() === 1 ? 'viaje' : 'viajes' }} en total)
+        </small>
+      </div>
+    </div>
+
+    <!-- Estado vacío -->
+    <ng-template #emptyState>
+      <div class="text-center py-5">
+        <div class="card shadow-sm">
+          <div class="card-body py-5">
+            <i class="fas fa-inbox text-muted mb-4" style="font-size: 4rem; opacity: 0.5;"></i>
+            <h4 class="text-muted mb-3">{{ getEmptyStateMessage() }}</h4>
+            
+            <!-- Botones de acción según estado -->
+            <div *ngIf="!hasTrips() && isPassenger">
+              <button class="btn btn-primary btn-lg" (click)="requestNewTrip()">
+                <i class="fas fa-plus me-2"></i>Solicitar Primer Viaje
+              </button>
+            </div>
+            
+            <div *ngIf="hasTrips() && !hasFilteredResults()">
+              <button class="btn btn-outline-primary" (click)="applyFilter('all'); clearSearch()">
+                <i class="fas fa-undo me-2"></i>Limpiar Filtros
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-template>
+
+    <!-- Botón flotante para pasajeros -->
+    <div class="fixed-bottom p-4" *ngIf="isPassenger && hasTrips()">
+      <div class="text-end">
+        <button class="btn btn-primary btn-lg rounded-circle shadow" 
+                (click)="requestNewTrip()"
+                style="width: 60px; height: 60px;">
+          <i class="fas fa-plus"></i>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+</div>

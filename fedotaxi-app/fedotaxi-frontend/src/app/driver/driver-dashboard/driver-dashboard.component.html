@@ -1,0 +1,375 @@
+<!-- Header -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+  <div class="container-fluid">
+    <button class="btn btn-outline-light me-2" (click)="goHome()">
+      <i class="fas fa-arrow-left"></i>
+    </button>
+    <span class="navbar-brand fw-bold fs-4">🚖 Dashboard Conductor</span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-light btn-sm" (click)="refreshTracking()">
+        <i class="fas fa-sync-alt"></i>
+      </button>
+      <button class="btn btn-outline-light btn-sm" (click)="updateLocation()" [disabled]="!canUpdateLocation">
+        <i class="fas fa-crosshairs"></i>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid p-3">
+
+  <!-- Estado del conductor con información GPS -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row align-items-center">
+        <div class="col-md-6">
+          <h5 class="card-title mb-2">
+            <i class="fas fa-user-tie me-2"></i>Estado del Conductor
+          </h5>
+          <div class="form-check form-switch">
+            <input class="form-check-input" 
+                   type="checkbox" 
+                   [checked]="isAvailable" 
+                   (change)="toggleAvailability()"
+                   [disabled]="isLoadingAvailability || hasAssignedTrip || hasCurrentTrip">
+            <label class="form-check-label fw-semibold">
+              <span *ngIf="isAvailable" class="text-success">
+                <i class="fas fa-circle me-1"></i>Disponible para viajes
+              </span>
+              <span *ngIf="!isAvailable" class="text-muted">
+                <i class="fas fa-circle me-1"></i>No disponible
+              </span>
+              <span *ngIf="isLoadingAvailability" class="spinner-border spinner-border-sm ms-2"></span>
+            </label>
+          </div>
+          <small class="text-muted d-block mt-1">
+            <i class="fas fa-satellite-dish me-1"></i>{{ getGPSModeInfo() }}
+          </small>
+        </div>
+        <div class="col-md-6 text-md-end">
+          <div class="d-flex flex-column align-items-md-end">
+            <small class="text-muted">{{ locationStatusText }}</small>
+            <small class="text-muted">{{ getUpdateFrequencyInfo() }}</small>
+            <button class="btn btn-primary btn-sm mt-1" 
+                    (click)="quickLocationUpdate()" 
+                    [disabled]="!canUpdateLocation">
+              <span *ngIf="!isLoadingLocation">
+                <i class="fas fa-location-arrow me-1"></i>Actualizar Ubicación
+              </span>
+              <span *ngIf="isLoadingLocation">
+                <i class="fas fa-spinner fa-spin me-1"></i>Obteniendo...
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Viaje asignado pendiente -->
+  <div *ngIf="hasAssignedTrip" class="card border-warning shadow mb-3">
+    <div class="card-header bg-warning text-dark">
+      <h5 class="card-title mb-0">
+        <i class="fas fa-bell me-2"></i>¡Nuevo Viaje Asignado! - #{{ assignedTrip!.id }}
+      </h5>
+    </div>
+    <div class="card-body">
+      <div class="alert alert-info mb-3">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Se te ha asignado un nuevo viaje.</strong> ¿Deseas aceptarlo?
+      </div>
+
+      <!-- Información del pasajero -->
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <div class="bg-light p-3 rounded">
+            <h6 class="text-primary mb-2">
+              <i class="fas fa-user me-2"></i>Información del Pasajero
+            </h6>
+            <p class="mb-1"><strong>Nombre:</strong> {{ assignedTrip!.passengerName || 'Pasajero' }}</p>
+            <p class="mb-0"><strong>ID:</strong> #{{ assignedTrip!.passengerId }}</p>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="bg-light p-3 rounded">
+            <h6 class="text-success mb-2">
+              <i class="fas fa-dollar-sign me-2"></i>Información del Viaje
+            </h6>
+            <p class="mb-1"><strong>Distancia estimada:</strong> {{ formatDistance(getEstimatedDistance(assignedTrip!)) }}</p>
+            <p class="mb-0"><strong>Tarifa estimada:</strong> ${{ getEstimatedFare(assignedTrip!).toFixed(2) }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Información de la ruta -->
+      <div class="bg-light p-3 rounded mb-3">
+        <h6 class="text-info mb-2">
+          <i class="fas fa-route me-2"></i>Ruta del Viaje
+        </h6>
+        <div class="row">
+          <div class="col-md-6">
+            <div class="d-flex align-items-start mb-2">
+              <div class="bg-success rounded-circle me-2 mt-1" style="width: 12px; height: 12px;"></div>
+              <div>
+                <small class="text-muted d-block">Origen (Recoger)</small>
+                <strong class="small">{{ assignedTrip!.originAddress || 'Punto de recogida' }}</strong>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="d-flex align-items-start">
+              <div class="bg-danger rounded-circle me-2 mt-1" style="width: 12px; height: 12px;"></div>
+              <div>
+                <small class="text-muted d-block">Destino</small>
+                <strong class="small">{{ assignedTrip!.destinationAddress || 'Punto de destino' }}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botones de acción -->
+      <div class="row g-2">
+        <div class="col-6">
+          <button class="btn btn-success w-100" 
+                  (click)="acceptAssignedTrip()" 
+                  [disabled]="isLoading">
+            <span *ngIf="!isLoading">
+              <i class="fas fa-check me-2"></i>Aceptar Viaje
+            </span>
+            <span *ngIf="isLoading">
+              <i class="fas fa-spinner fa-spin me-2"></i>Aceptando...
+            </span>
+          </button>
+        </div>
+        <div class="col-6">
+          <button class="btn btn-outline-danger w-100" 
+                  (click)="rejectAssignedTrip()" 
+                  [disabled]="isLoading">
+            <i class="fas fa-times me-2"></i>Rechazar
+          </button>
+        </div>
+      </div>
+
+      <!-- Distancia al punto de recogida -->
+      <div class="text-center mt-3" *ngIf="getDistanceToTrip(assignedTrip!)">
+        <small class="text-muted">
+          <i class="fas fa-map-marker-alt me-1"></i>
+          Distancia al punto de recogida: <strong>{{ getDistanceToTrip(assignedTrip!) }}</strong>
+        </small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Viaje actual (si fue aceptado) -->
+  <div *ngIf="hasCurrentTrip && !hasAssignedTrip">
+    <div class="card border-primary shadow-sm mb-3">
+      <div class="card-header bg-primary text-white">
+        <h5 class="card-title mb-0">
+          <i class="fas fa-car me-2"></i>Viaje Actual - #{{ currentTrip!.id }}
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <h6 class="text-success mb-2">Estado: {{ currentTrip!.status }}</h6>
+            <p class="mb-1"><strong>Pasajero:</strong> {{ currentTrip!.passengerName || 'Pasajero' }}</p>
+            <p class="mb-1"><strong>Origen:</strong> {{ currentTrip!.originAddress || 'Punto de recogida' }}</p>
+            <p class="mb-1"><strong>Destino:</strong> {{ currentTrip!.destinationAddress || 'Punto de destino' }}</p>
+            <p class="mb-0"><strong>Tarifa:</strong> ${{ (currentTrip!.fare || getEstimatedFare(currentTrip!)).toFixed(2) }}</p>
+          </div>
+
+          <div class="col-md-6">
+            <div class="d-grid gap-2">
+              <button *ngIf="currentTrip!.status === TripStatus.ACCEPTED" 
+                      class="btn btn-success" 
+                      (click)="startTrip()"
+                      [disabled]="isLoading">
+                <span *ngIf="!isLoading">
+                  <i class="fas fa-play me-2"></i>Iniciar Viaje
+                </span>
+                <span *ngIf="isLoading">
+                  <i class="fas fa-spinner fa-spin me-2"></i>Iniciando...
+                </span>
+              </button>
+              
+              <button *ngIf="currentTrip!.status === TripStatus.IN_PROGRESS" 
+                      class="btn btn-primary" 
+                      (click)="completeTrip()"
+                      [disabled]="isLoading">
+                <span *ngIf="!isLoading">
+                  <i class="fas fa-flag-checkered me-2"></i>Completar Viaje
+                </span>
+                <span *ngIf="isLoading">
+                  <i class="fas fa-spinner fa-spin me-2"></i>Completando...
+                </span>
+              </button>
+              
+              <button class="btn btn-outline-danger" 
+                      (click)="cancelTrip()"
+                      [disabled]="isLoading">
+                <i class="fas fa-times me-2"></i>Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Viajes disponibles (solo cuando no hay viajes asignados ni actuales) -->
+  <div *ngIf="!hasAssignedTrip && !hasCurrentTrip && isAvailable">
+    <div class="card shadow-sm">
+      <div class="card-header bg-success text-white">
+        <h5 class="card-title mb-0">
+          <i class="fas fa-list me-2"></i>Viajes Disponibles ({{ availableTrips.length }})
+        </h5>
+      </div>
+      <div class="card-body">
+        <div *ngIf="availableTrips.length > 0; else noTripsAvailable">
+          <div class="row g-3">
+            <div class="col-md-6" *ngFor="let trip of availableTrips">
+              <div class="card border-success">
+                <div class="card-body">
+                  <h6 class="card-title">Viaje #{{ trip.id }}</h6>
+                  <p class="card-text small mb-2">
+                    <strong>Desde:</strong> {{ trip.originAddress || 'Origen' }}<br>
+                    <strong>Hasta:</strong> {{ trip.destinationAddress || 'Destino' }}
+                  </p>
+                  <div class="row g-2 mb-2">
+                    <div class="col-6">
+                      <small class="text-muted">Distancia</small>
+                      <div class="fw-bold">{{ formatDistance(getEstimatedDistance(trip)) }}</div>
+                    </div>
+                    <div class="col-6">
+                      <small class="text-muted">Tarifa</small>
+                      <div class="fw-bold text-success">${{ getEstimatedFare(trip).toFixed(2) }}</div>
+                    </div>
+                  </div>
+                  <button class="btn btn-primary w-100" 
+                          (click)="acceptTrip(trip.id)"
+                          [disabled]="isLoading">
+                    <span *ngIf="!isLoading">
+                      <i class="fas fa-check me-1"></i>Aceptar
+                    </span>
+                    <span *ngIf="isLoading">
+                      <i class="fas fa-spinner fa-spin me-1"></i>Aceptando...
+                    </span>
+                  </button>
+                  <small class="text-muted d-block text-center mt-1" *ngIf="getDistanceToTrip(trip)">
+                    {{ getDistanceToTrip(trip) }} de distancia
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <ng-template #noTripsAvailable>
+          <div class="text-center py-4">
+            <i class="fas fa-car text-muted mb-3" style="font-size: 3rem; opacity: 0.5;"></i>
+            <h5 class="text-muted">No hay viajes disponibles</h5>
+            <p class="text-muted">Mantente atento, pronto aparecerán nuevas solicitudes.</p>
+            <button class="btn btn-outline-primary" (click)="refreshTracking()">
+              <i class="fas fa-sync-alt me-2"></i>Actualizar
+            </button>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estado no disponible -->
+  <div *ngIf="!isAvailable && !hasAssignedTrip && !hasCurrentTrip">
+    <div class="card shadow-sm">
+      <div class="card-body text-center py-5">
+        <i class="fas fa-car text-muted mb-3" style="font-size: 4rem; opacity: 0.3;"></i>
+        <h4 class="text-muted mb-3">No estás disponible para viajes</h4>
+        <p class="text-muted mb-4">Activa tu disponibilidad para comenzar a recibir solicitudes de viaje.</p>
+        <button class="btn btn-success btn-lg" (click)="toggleAvailability()" [disabled]="isLoadingAvailability">
+          <span *ngIf="!isLoadingAvailability">
+            <i class="fas fa-power-off me-2"></i>Activar Disponibilidad
+          </span>
+          <span *ngIf="isLoadingAvailability">
+            <i class="fas fa-spinner fa-spin me-2"></i>Activando...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mensajes de estado -->
+  <div class="mt-3">
+    <div class="alert alert-success" *ngIf="successMessage">
+      <i class="fas fa-check-circle me-2"></i>
+      {{ successMessage }}
+    </div>
+
+    <div class="alert alert-danger" *ngIf="errorMessage">
+      <i class="fas fa-exclamation-triangle me-2"></i>
+      {{ errorMessage }}
+    </div>
+  </div>
+
+  <!-- Información de ubicación GPS -->
+  <div class="card mt-4 bg-light" *ngIf="hasLocation">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="card-title mb-0">📍 Información de Ubicación GPS</h6>
+        <button class="btn btn-outline-secondary btn-sm" (click)="debugDriverState()">
+          <i class="fas fa-bug me-1"></i>Debug Estado
+        </button>
+      </div>
+      
+      <div class="row g-2 text-small">
+        <div class="col-md-4">
+          <small class="text-muted d-block"><strong>Coordenadas:</strong></small>
+          <small>{{ getLocationInfo() }}</small>
+        </div>
+        <div class="col-md-2">
+          <small class="text-muted d-block"><strong>Estado GPS:</strong></small>
+          <small class="fw-bold" [class]="'text-' + (getGPSStatus() === 'Excelente' ? 'success' : getGPSStatus() === 'Buena' ? 'info' : 'warning')">
+            {{ getGPSStatus() }}
+          </small>
+        </div>
+        <div class="col-md-3">
+          <small class="text-muted d-block"><strong>Última actualización:</strong></small>
+          <small>{{ getLocationAge() || 'No disponible' }}</small>
+        </div>
+        <div class="col-md-3">
+          <small class="text-muted d-block"><strong>Modo GPS:</strong></small>
+          <small class="fw-bold" [class]="isDynamicMode ? 'text-primary' : 'text-secondary'">
+            {{ gpsCurrentMode.toUpperCase() }}
+          </small>
+        </div>
+      </div>
+      
+      <div class="mt-2">
+        <small class="text-muted">
+          <strong>En Ecuador:</strong> 
+          <span [class]="isLocationInEcuador() ? 'text-success' : 'text-danger'">
+            {{ isLocationInEcuador() ? 'Sí' : 'No' }}
+          </span>
+          <span class="ms-3">
+            <strong>Viaje activo:</strong>
+            <span [class]="hasActiveTrip ? 'text-success' : 'text-muted'">
+              {{ hasActiveTrip ? 'Sí (GPS dinámico)' : 'No (GPS estático)' }}
+            </span>
+          </span>
+        </small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Indicador de actualización automática -->
+  <div class="fixed-bottom p-3" *ngIf="isAvailable && (hasAssignedTrip || hasCurrentTrip || availableTrips.length > 0)">
+    <div class="d-flex justify-content-center">
+      <div class="bg-primary text-white px-3 py-2 rounded-pill d-inline-flex align-items-center opacity-90 shadow">
+        <div class="spinner-border spinner-border-sm me-2" style="width: 16px; height: 16px;"></div>
+        <small *ngIf="!isDynamicMode">Polling cada 5s | GPS estático</small>
+        <small *ngIf="isDynamicMode">GPS tracking activo | Actualización automática</small>
+      </div>
+    </div>
+  </div>
+
+</div>
